@@ -1,7 +1,9 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
 )
+
 import yfinance as yf
 import ta
 import numpy as np
@@ -141,7 +143,7 @@ def get_best_opportunities():
     if not results:
         return "❌ No strong opportunities today"
 
-    text = "🔥 *Top Opportunities Today*\n\n"
+    text = "🔥 Top Opportunities Today\n\n"
 
     for s in results:
         text += f"• {s['symbol']} – ₹{round(s['price'],2)}\n"
@@ -192,43 +194,44 @@ def hedge_output(symbol):
 Pair: {pair}
 Correlation: {round(corr,2)}
 
-📌 Lower correlation → better diversification
+📌 Lower correlation = better diversification
 
 ⚠️ Not a perfect hedge
 """
 
 
-# -------- START -------- #
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    keyboard = [
-        [InlineKeyboardButton("📊 Analyze Stock", callback_data="analyze")],
-        [InlineKeyboardButton("🔥 Opportunities Today", callback_data="buy")],
-        [InlineKeyboardButton("🛡 Hedge Suggestion", callback_data="hedge")]
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await update.message.reply_text(
-        "📊 FinAdvisor Bot\n\nChoose an option 👇",
-        reply_markup=reply_markup
+# -------- MENU -------- #
+def get_menu():
+    return ReplyKeyboardMarkup(
+        [
+            ["📊 Analyze", "🔥 Opportunities"],
+            ["🛡 Hedge"]
+        ],
+        resize_keyboard=True
     )
 
 
-# -------- BUTTON HANDLER -------- #
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+# -------- START -------- #
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📊 FinAdvisor Bot Ready 🚀\nChoose an option:",
+        reply_markup=get_menu()
+    )
 
-    if query.data == "analyze":
-        await query.edit_message_text("Use:\n/analyze TCS")
 
-    elif query.data == "buy":
+# -------- MENU HANDLER -------- #
+async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "📊 Analyze":
+        await update.message.reply_text("Use: /analyze TCS")
+
+    elif text == "🔥 Opportunities":
         result = get_best_opportunities()
-        await query.edit_message_text(result, parse_mode="Markdown")
+        await update.message.reply_text(result)
 
-    elif query.data == "hedge":
-        await query.edit_message_text("Use:\n/hedge TCS")
+    elif text == "🛡 Hedge":
+        await update.message.reply_text("Use: /hedge TCS")
 
 
 # -------- COMMANDS -------- #
@@ -260,6 +263,6 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
 app.add_handler(CommandHandler("hedge", hedge))
-app.add_handler(CallbackQueryHandler(button_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
 
 app.run_polling()
