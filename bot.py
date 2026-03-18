@@ -9,7 +9,7 @@ import ta
 import numpy as np
 import os
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = "8500788722:AAGd5qkDBqD0I53e6gVPZoNHlaVuwjoRry0"
 
 
 # -------- ANALYSIS -------- #
