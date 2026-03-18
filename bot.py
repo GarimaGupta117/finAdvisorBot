@@ -4,12 +4,12 @@ from telegram.ext import (
 )
 import yfinance as yf
 import ta
+import numpy as np
 import os
 
 TOKEN = "8500788722:AAGd5qkDBqD0I53e6gVPZoNHlaVuwjoRry0"
 
-
-# -------- ANALYSIS FUNCTION -------- #
+# -------- ANALYSIS -------- #
 def analyze_stock(symbol):
     stock = yf.Ticker(symbol + ".NS")
     hist = stock.history(period="1mo")
@@ -21,8 +21,7 @@ def analyze_stock(symbol):
     volume = hist["Volume"]
 
     last_price = close.iloc[-1]
-
-    ma20 = close.rolling(window=20).mean().iloc[-1]
+    ma20 = close.rolling(20).mean().iloc[-1]
     rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
 
     avg_vol = volume.mean()
@@ -36,7 +35,7 @@ def analyze_stock(symbol):
     else:
         trend = "Bearish 📉"
 
-    if 40 < rsi < 70:
+    if 40 < rsi < 65:
         momentum = "Healthy"
         score += 1
     elif rsi >= 70:
@@ -73,27 +72,129 @@ Volume: {volume_signal}
 """
 
 
-# -------- TOP PICKS -------- #
-def get_top_picks():
-    stocks = ["TCS", "INFY", "RELIANCE", "HDFCBANK"]
+# -------- OPPORTUNITIES -------- #
+def advanced_score(symbol):
+    stock = yf.Ticker(symbol + ".NS")
+    hist = stock.history(period="1mo")
 
-    result = "📈 Top Stocks Today:\n\n"
+    if hist.empty:
+        return None
+
+    close = hist["Close"]
+    volume = hist["Volume"]
+
+    last_price = close.iloc[-1]
+    prev_price = close.iloc[-2]
+
+    ma20 = close.rolling(20).mean().iloc[-1]
+    rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
+
+    avg_vol = volume.mean()
+    latest_vol = volume.iloc[-1]
+
+    change = ((last_price - prev_price) / prev_price) * 100
+    volatility = close.pct_change().std()
+
+    score = 0
+    reasons = []
+
+    if last_price > ma20:
+        score += 1
+        reasons.append("Above MA20")
+
+    if 40 < rsi < 65:
+        score += 1
+        reasons.append("Healthy RSI")
+
+    if latest_vol > avg_vol:
+        score += 1
+        reasons.append("High Volume")
+
+    if change > 0:
+        score += 1
+        reasons.append("Positive Momentum")
+
+    if volatility < 0.02:
+        score += 1
+        reasons.append("Stable")
+
+    return {
+        "symbol": symbol,
+        "price": last_price,
+        "score": score,
+        "reasons": reasons
+    }
+
+
+def get_best_opportunities():
+    stocks = ["TCS", "INFY", "RELIANCE", "HDFCBANK", "ICICIBANK"]
+
+    results = []
 
     for s in stocks:
-        result += analyze_stock(s) + "\n"
+        data = advanced_score(s)
+        if data and data["score"] >= 3:
+            results.append(data)
 
-    return result
+    results = sorted(results, key=lambda x: x["score"], reverse=True)
+
+    if not results:
+        return "❌ No strong opportunities today"
+
+    text = "🔥 *Top Opportunities Today*\n\n"
+
+    for s in results:
+        text += f"• {s['symbol']} – ₹{round(s['price'],2)}\n"
+        text += f"Score: {s['score']}/5\n"
+        text += f"Signals: {', '.join(s['reasons'])}\n\n"
+
+    text += "⚠️ Based on multi-factor analysis"
+
+    return text
 
 
-# -------- IPO -------- #
-def get_ipo():
-    return """
-🚀 IPO Updates
+# -------- HEDGE -------- #
+def find_hedge(symbol):
+    stocks = ["TCS", "INFY", "RELIANCE", "HDFCBANK", "ICICIBANK"]
 
-• Tata Tech (Example)
-• Strong interest expected
+    base = yf.Ticker(symbol + ".NS").history(period="1mo")["Close"]
 
-⚠️ Always check fundamentals before applying
+    best_pair = None
+    lowest_corr = 1
+
+    for s in stocks:
+        if s == symbol:
+            continue
+
+        other = yf.Ticker(s + ".NS").history(period="1mo")["Close"]
+
+        if len(other) != len(base):
+            continue
+
+        corr = np.corrcoef(base, other)[0][1]
+
+        if corr < lowest_corr:
+            lowest_corr = corr
+            best_pair = s
+
+    return best_pair, lowest_corr
+
+
+def hedge_output(symbol):
+    pair, corr = find_hedge(symbol)
+
+    if not pair:
+        return "❌ Could not find hedge"
+
+    return f"""
+🛡 Hedge for {symbol.upper()}
+
+Pair: {pair}
+Correlation: {round(corr,2)}
+
+📌 Lower correlation → better diversification
+
+⚠️ Not a perfect hedge
 """
 
 
@@ -102,8 +203,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📊 Analyze Stock", callback_data="analyze")],
-        [InlineKeyboardButton("📈 Top Picks Today", callback_data="top")],
-        [InlineKeyboardButton("🚀 IPO Updates", callback_data="ipo")]
+        [InlineKeyboardButton("🔥 Opportunities Today", callback_data="buy")],
+        [InlineKeyboardButton("🛡 Hedge Suggestion", callback_data="hedge")]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -120,20 +221,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "analyze":
-        await query.edit_message_text(
-            "Type like:\n/analyze TCS"
-        )
+        await query.edit_message_text("Use:\n/analyze TCS")
 
-    elif query.data == "top":
-        result = get_top_picks()
-        await query.edit_message_text(result)
+    elif query.data == "buy":
+        result = get_best_opportunities()
+        await query.edit_message_text(result, parse_mode="Markdown")
 
-    elif query.data == "ipo":
-        result = get_ipo()
-        await query.edit_message_text(result)
+    elif query.data == "hedge":
+        await query.edit_message_text("Use:\n/hedge TCS")
 
 
-# -------- ANALYZE COMMAND -------- #
+# -------- COMMANDS -------- #
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Example: /analyze TCS")
@@ -145,11 +243,23 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(result)
 
 
+async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Example: /hedge TCS")
+        return
+
+    symbol = context.args[0]
+    result = hedge_output(symbol)
+
+    await update.message.reply_text(result)
+
+
 # -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
+app.add_handler(CommandHandler("hedge", hedge))
 app.add_handler(CallbackQueryHandler(button_handler))
 
 app.run_polling()
