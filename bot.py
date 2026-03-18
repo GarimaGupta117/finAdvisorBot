@@ -1,5 +1,7 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+)
 import yfinance as yf
 import ta
 import os
@@ -7,6 +9,7 @@ import os
 TOKEN = "8500788722:AAGd5qkDBqD0I53e6gVPZoNHlaVuwjoRry0"
 
 
+# -------- ANALYSIS FUNCTION -------- #
 def analyze_stock(symbol):
     stock = yf.Ticker(symbol + ".NS")
     hist = stock.history(period="1mo")
@@ -70,12 +73,67 @@ Volume: {volume_signal}
 """
 
 
+# -------- TOP PICKS -------- #
+def get_top_picks():
+    stocks = ["TCS", "INFY", "RELIANCE", "HDFCBANK"]
+
+    result = "📈 Top Stocks Today:\n\n"
+
+    for s in stocks:
+        result += analyze_stock(s) + "\n"
+
+    return result
+
+
+# -------- IPO -------- #
+def get_ipo():
+    return """
+🚀 IPO Updates
+
+• Tata Tech (Example)
+• Strong interest expected
+
+⚠️ Always check fundamentals before applying
+"""
+
+
+# -------- START -------- #
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    keyboard = [
+        [InlineKeyboardButton("📊 Analyze Stock", callback_data="analyze")],
+        [InlineKeyboardButton("📈 Top Picks Today", callback_data="top")],
+        [InlineKeyboardButton("🚀 IPO Updates", callback_data="ipo")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     await update.message.reply_text(
-        "📊 FinAdvisor Bot\n\nUse:\n/analyze TCS"
+        "📊 FinAdvisor Bot\n\nChoose an option 👇",
+        reply_markup=reply_markup
     )
 
 
+# -------- BUTTON HANDLER -------- #
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "analyze":
+        await query.edit_message_text(
+            "Type like:\n/analyze TCS"
+        )
+
+    elif query.data == "top":
+        result = get_top_picks()
+        await query.edit_message_text(result)
+
+    elif query.data == "ipo":
+        result = get_ipo()
+        await query.edit_message_text(result)
+
+
+# -------- ANALYZE COMMAND -------- #
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Example: /analyze TCS")
@@ -87,9 +145,11 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(result)
 
 
+# -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
+app.add_handler(CallbackQueryHandler(button_handler))
 
 app.run_polling()
