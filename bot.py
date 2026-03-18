@@ -257,12 +257,15 @@ async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
 
-# Set Telegram menu (≡ button)
-app.bot.set_my_commands([
-    BotCommand("start", "Start bot"),
-    BotCommand("analyze", "Analyze stock"),
-    BotCommand("hedge", "Hedge suggestion"),
-])
+# FIXED async commands setup
+async def setup_commands(app):
+    await app.bot.set_my_commands([
+        BotCommand("start", "Start bot"),
+        BotCommand("analyze", "Analyze stock"),
+        BotCommand("hedge", "Hedge suggestion"),
+    ])
+
+app.post_init = setup_commands
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
