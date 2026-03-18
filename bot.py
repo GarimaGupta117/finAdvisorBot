@@ -1,4 +1,4 @@
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, BotCommand
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
@@ -10,6 +10,7 @@ import numpy as np
 import os
 
 TOKEN = "8500788722:AAGd5qkDBqD0I53e6gVPZoNHlaVuwjoRry0"
+
 
 # -------- ANALYSIS -------- #
 def analyze_stock(symbol):
@@ -204,7 +205,8 @@ Correlation: {round(corr,2)}
 def get_menu():
     return ReplyKeyboardMarkup(
         [
-            ["📊 Analyze", "🔥 Opportunities"],
+            ["📊 Analyze"],
+            ["🔥 Opportunities"],
             ["🛡 Hedge"]
         ],
         resize_keyboard=True
@@ -227,8 +229,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Use: /analyze TCS")
 
     elif text == "🔥 Opportunities":
-        result = get_best_opportunities()
-        await update.message.reply_text(result)
+        await update.message.reply_text(get_best_opportunities())
 
     elif text == "🛡 Hedge":
         await update.message.reply_text("Use: /hedge TCS")
@@ -241,9 +242,7 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     symbol = context.args[0]
-    result = analyze_stock(symbol)
-
-    await update.message.reply_text(result)
+    await update.message.reply_text(analyze_stock(symbol))
 
 
 async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -252,13 +251,18 @@ async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     symbol = context.args[0]
-    result = hedge_output(symbol)
-
-    await update.message.reply_text(result)
+    await update.message.reply_text(hedge_output(symbol))
 
 
 # -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
+
+# Set Telegram menu (≡ button)
+app.bot.set_my_commands([
+    BotCommand("start", "Start bot"),
+    BotCommand("analyze", "Analyze stock"),
+    BotCommand("hedge", "Hedge suggestion"),
+])
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
