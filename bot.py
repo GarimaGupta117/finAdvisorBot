@@ -1,7 +1,6 @@
-from telegram import Update, ReplyKeyboardMarkup, BotCommand
+from telegram import Update, BotCommand
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
+    ApplicationBuilder, CommandHandler, ContextTypes
 )
 
 import yfinance as yf
@@ -201,41 +200,13 @@ Correlation: {round(corr,2)}
 """
 
 
-# -------- MENU -------- #
-def get_menu():
-    return ReplyKeyboardMarkup(
-        [
-            ["📊 Analyze"],
-            ["🔥 Opportunities"],
-            ["🛡 Hedge"]
-        ],
-        resize_keyboard=True
-    )
-
-
-# -------- START -------- #
+# -------- COMMANDS -------- #
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📊 FinAdvisor Bot Ready 🚀\nChoose an option:",
-        reply_markup=get_menu()
+        "📊 FinAdvisor Bot\n\nUse menu (≡) to explore options"
     )
 
 
-# -------- MENU HANDLER -------- #
-async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-
-    if text == "📊 Analyze":
-        await update.message.reply_text("Use: /analyze TCS")
-
-    elif text == "🔥 Opportunities":
-        await update.message.reply_text(get_best_opportunities())
-
-    elif text == "🛡 Hedge":
-        await update.message.reply_text("Use: /hedge TCS")
-
-
-# -------- COMMANDS -------- #
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Example: /analyze TCS")
@@ -243,6 +214,10 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     symbol = context.args[0]
     await update.message.reply_text(analyze_stock(symbol))
+
+
+async def opportunities(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_best_opportunities())
 
 
 async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -257,21 +232,25 @@ async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
 
-# Async setup (fixes both issues)
+
 async def setup(app):
     await app.bot.delete_webhook(drop_pending_updates=True)
 
     await app.bot.set_my_commands([
+        BotCommand("analyze", "📊 Analyze stock"),
+        BotCommand("opportunities", "🔥 Opportunities today"),
+        BotCommand("hedge", "🛡 Hedge suggestion"),
         BotCommand("start", "Start bot"),
-        BotCommand("analyze", "Analyze stock"),
-        BotCommand("hedge", "Hedge suggestion"),
     ])
+
 
 app.post_init = setup
 
+
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
+app.add_handler(CommandHandler("opportunities", opportunities))
 app.add_handler(CommandHandler("hedge", hedge))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+
 
 app.run_polling()
