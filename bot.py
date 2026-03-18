@@ -9,7 +9,7 @@ import ta
 import numpy as np
 import os
 
-TOKEN = "8500788722:AAGd5qkDBqD0I53e6gVPZoNHlaVuwjoRry0"
+TOKEN = os.getenv("BOT_TOKEN")
 
 
 # -------- ANALYSIS -------- #
@@ -257,15 +257,17 @@ async def hedge(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
 
-# FIXED async commands setup
-async def setup_commands(app):
+# Async setup (fixes both issues)
+async def setup(app):
+    await app.bot.delete_webhook(drop_pending_updates=True)
+
     await app.bot.set_my_commands([
         BotCommand("start", "Start bot"),
         BotCommand("analyze", "Analyze stock"),
         BotCommand("hedge", "Hedge suggestion"),
     ])
 
-app.post_init = setup_commands
+app.post_init = setup
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("analyze", analyze))
