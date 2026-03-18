@@ -4,9 +4,9 @@ import yfinance as yf
 import ta
 import os
 
-TOKEN = "8500788722:AAGd5qkDBqD0I53e6gVPZoNHlaVuwjoRry0"
+TOKEN = os.getenv("BOT_TOKEN")
 
-# -------- STOCK ANALYSIS -------- #
+
 def analyze_stock(symbol):
     stock = yf.Ticker(symbol + ".NS")
     hist = stock.history(period="1mo")
@@ -19,14 +19,12 @@ def analyze_stock(symbol):
 
     last_price = close.iloc[-1]
 
-    # Indicators
     ma20 = close.rolling(window=20).mean().iloc[-1]
     rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
 
     avg_vol = volume.mean()
     latest_vol = volume.iloc[-1]
 
-    # Logic
     score = 0
 
     if last_price > ma20:
@@ -49,7 +47,6 @@ def analyze_stock(symbol):
     else:
         volume_signal = "Normal"
 
-    # Final signal
     if score >= 2:
         signal = "Moderate Bullish"
         confidence = "7/10"
@@ -73,30 +70,23 @@ Volume: {volume_signal}
 """
 
 
-# -------- START -------- #
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📊 Welcome to FinAdvisor Bot\n\n"
-        "Use:\n"
-        "/analyze TCS\n"
-        "/analyze INFY"
+        "📊 FinAdvisor Bot\n\nUse:\n/analyze TCS"
     )
 
 
-# -------- ANALYZE COMMAND -------- #
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("❌ Please provide stock name\nExample: /analyze TCS")
+        await update.message.reply_text("Example: /analyze TCS")
         return
 
     symbol = context.args[0]
-
     result = analyze_stock(symbol)
 
     await update.message.reply_text(result)
 
 
-# -------- MAIN -------- #
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
